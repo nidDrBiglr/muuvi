@@ -32,54 +32,52 @@ static uint8_t mfg_data[] = {
 	// Data format 5 (RAWv2)
 	0x05,
 	// Temperature in 0.005 degree steps
-	// valid values: -32767 ... 32767
-	0x12, 0xFC,
+	// valid values: -32767 ... 32767, "not available": 0x8000
+	0x80, 0x00,
 	// Humidity (16bit unsigned) in 0.0025% steps (0-163.83% range, though realistically 0-100%)
-	// valid values: 0 ... 40000
-	0x53, 0x94,
+	// valid values: 0 ... 40000, "not available": 0xFFFF
+	0xFF, 0xFF,
 	// Atmospheric pressure (16bit unsigned) in 1 Pa units, with offset of -50 000 Pa
-	// valid values: 0 ... 65534
-	0xC3, 0x7C,
+	// valid values: 0 ... 65534, "not available": 0xFFFF
+	0xFF, 0xFF,
 	// Acceleration-X (Most Significant Byte first)
-	// valid values: -32767 ... 32767
-	0x00, 0x00, // unused
+	// valid values: -32767 ... 32767, "not available": 0x8000
+	0x80, 0x00,
 	// Acceleration-Y (Most Significant Byte first)
-	// valid values: -32767 ... 32767
-	0x00, 0x00, // unused
+	// valid values: -32767 ... 32767, "not available": 0x8000
+	0x80, 0x00,
 	// Acceleration-Z (Most Significant Byte first)
-	// valid values: -32767 ... 32767
-	0x00, 0x00, // unused
+	// valid values: -32767 ... 32767, "not available": 0x8000
+	0x80, 0x00,
 	// Power info (11+5bit unsigned)
 	// First 11 bits is the battery voltage above 1.6V, in millivolts (1.6V to 3.646V range)
 	// Last 5 bits unsigned are the TX power above -40dBm, in 2dBm steps. (-40dBm to +20dBm range)
-	// (0 ... 2046, 0 ... 30)
-	// statically set to 3.646mV, since its powered by USB
-	// 3.646mV = 2046 = 11111111110, +0dBm = 20 = 10100
-	// 1111111111010100 = 0xFFD4
-	0xFF, 0xD4, // static
+	// valid values: 0 ... 2046 and 0 ... 30 respectively
+	// statically set to 3.3V, since its powered by USB
+	// 3.3V = 1700 = 11010100100, +0dBm = 20 = 10100 => 1101010010010100b = 0xD494h
+	0xD4, 0x94, // static
 	// Movement counter (8 bit unsigned), incremented by motion detection interrupts from accelerometer
-	// valie values: 0 ... 254
-	// unused
-	0x00, // unused
+	// valie values: 0 ... 254, "not available": 0xFF
+	0xFF, // unused
 	// Measurement sequence number (16 bit unsigned), each time a measurement is taken, this is incremented by one, used for measurement de-duplication.
 	// Depending on the transmit interval, multiple packets with the same measurements can be sent, and there may be measurements that never were sent.
-	// valid values: 0 ... 65534
-	0xFF, 0xFF, // incremented each time a measurement is recorded, default value is 65535 to indicated "not available"
-	// 48bit MAC address
+	// valid values: 0 ... 65534, "not available": 0xFFFF
+	0xFF, 0xFF, // incremented each time a measurement is recorded
+	// valid MAC address
 	0xC7, 0x83, 0xB2, 0xBC, 0xC1, 0x53};
 
 // advertisement parameters
 static const struct bt_le_adv_param adv_params = {
 	.id = BT_ID_DEFAULT,
-	.options = BT_LE_ADV_OPT_USE_IDENTITY,
-	.interval_min = BT_GAP_PER_ADV_SLOW_INT_MIN,
-	.interval_max = BT_GAP_PER_ADV_SLOW_INT_MAX,
+	.options = BT_LE_ADV_OPT_CONNECTABLE,
+	.interval_min = BT_GAP_PER_ADV_SLOW_INT_MIN, // 1s
+	.interval_max = BT_GAP_PER_ADV_SLOW_INT_MAX, // 1.2s
 	.peer = NULL,
 };
 
 // advertisement data
 static const struct bt_data ad[] = {
-	BT_DATA(BT_DATA_MANUFACTURER_DATA, mfg_data, sizeof(mfg_data)),
+	BT_DATA(BT_DATA_MANUFACTURER_DATA, mfg_data, sizeof(mfg_data)) // measurements
 };
 
 // scan response data
