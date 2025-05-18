@@ -22,11 +22,10 @@ For more details see the [nrf52840dongle documentation](https://docs.nordicsemi.
 
 ## TODOs
 
+- updates to use latest ncs
 - get sensor values from DHT11 or DHT22 via I2C
 - add modules for DHT11/22 handling, BLE advertising and LED handling
-- dynamically add the hw mac address to the advertisement info
-- suffix the advertised name with the last 4 bytes of the mac address
 - add sequence diagram
 - add hw wiring diagram
 - add LED status indicator documentation
-- add github actions workflow to build the hex file and add it as a release
+- add github actions workflow to build the hex file and add it as a release (very low prio)

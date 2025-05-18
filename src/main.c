@@ -13,10 +13,11 @@
 #include <stdio.h>
 
 #define MEASUREMENT_INTERVAL K_SECONDS(30)
-#define LED1_NODE DT_ALIAS(led0)
-#define LED2_NODE_R DT_ALIAS(led1)
-#define LED2_NODE_G DT_ALIAS(led2)
-#define LED2_NODE_B DT_ALIAS(led3)
+#define LED1_NODE            DT_ALIAS(led0)
+#define LED2_NODE_R          DT_ALIAS(led1)
+#define LED2_NODE_G          DT_ALIAS(led2)
+#define LED2_NODE_B          DT_ALIAS(led3)
+#define DEVICE_NAME_MAX_LEN  50
 
 LOG_MODULE_REGISTER(muuvi);
 
@@ -51,25 +52,29 @@ static uint8_t mfg_data[] = {
 	0x80, 0x00,
 	// Power info (11+5bit unsigned)
 	// First 11 bits is the battery voltage above 1.6V, in millivolts (1.6V to 3.646V range)
-	// Last 5 bits unsigned are the TX power above -40dBm, in 2dBm steps. (-40dBm to +20dBm range)
+	// Last 5 bits unsigned are the TX power above -40dBm - +20dB,, in 2dBm steps.
 	// valid values: 0 ... 2046 and 0 ... 30 respectively
 	// statically set to 3.3V, since its powered by USB
-	// 3.3V = 1700 = 11010100100, +0dBm = 20 = 10100 => 1101010010010100b = 0xD494h
+	// 3.3V = 1700 = 11010100100, +0dBm = 20 = 10100 => 1101010010010100_b = 0xD494_h
 	0xD4, 0x94, // static
-	// Movement counter (8 bit unsigned), incremented by motion detection interrupts from accelerometer
+	// Movement counter (8 bit unsigned), incremented by motion detection interrupts from
+	// accelerometer
 	// valie values: 0 ... 254, "not available": 0xFF
 	0xFF, // unused
-	// Measurement sequence number (16 bit unsigned), each time a measurement is taken, this is incremented by one, used for measurement de-duplication.
-	// Depending on the transmit interval, multiple packets with the same measurements can be sent, and there may be measurements that never were sent.
+	// Measurement sequence number (16 bit unsigned), each time a measurement is taken, this is
+	// incremented by one, used for measurement de-duplication.
+	// Depending on the transmit interval, multiple packets with the same measurements can be
+	// sent, and there may be measurements that never were sent.
 	// valid values: 0 ... 65534, "not available": 0xFFFF
 	0xFF, 0xFF, // incremented each time a measurement is recorded
-	// valid MAC address
-	0xC7, 0x83, 0xB2, 0xBC, 0xC1, 0x53};
+	// any valid MAC address
+	// will be dynamically set by the firmware after the BLE module is initialized
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 // advertisement parameters
 static const struct bt_le_adv_param adv_params = {
 	.id = BT_ID_DEFAULT,
-	.options = BT_LE_ADV_OPT_CONNECTABLE,
+	.options = BT_LE_ADV_OPT_USE_IDENTITY,       // use HW address
 	.interval_min = BT_GAP_PER_ADV_SLOW_INT_MIN, // 1s
 	.interval_max = BT_GAP_PER_ADV_SLOW_INT_MAX, // 1.2s
 	.peer = NULL,
@@ -81,16 +86,19 @@ static const struct bt_data ad[] = {
 };
 
 // scan response data
-static const struct bt_data sd[] = {
-	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1), // device name
-	BT_DATA(BT_DATA_TX_POWER, "\x00", 1),													  // tx power level (+0dBm), static
+static char device_name[DEVICE_NAME_MAX_LEN];
+static struct bt_data sd[] = {
+	BT_DATA(BT_DATA_NAME_COMPLETE, device_name, 0), // device name, set dynamically
+	BT_DATA(BT_DATA_TX_POWER, "\x00", 1),           // tx power level (+0dBm), static
 };
 
 // sequence number, will be updated whenever a new measurement is recorded
-// set initial value to 65535 to indicate "not available" if, for some reason, the sequence number is not updated
+// set initial value to 65535 to indicate "not available" if, for some reason, the sequence number
+// is not updated
 static uint16_t sequence_number = 65535;
 
-// generate a random temperature value (-32767 to 32767, mapped to -163.835 to +163.835 degrees in 0.005 increments)
+// generate a random temperature value (-32767 to 32767, mapped to -163.835 to +163.835 degrees in
+// 0.005 increments)
 int16_t generate_random_temperature(void)
 {
 	return (sys_rand32_get() % 65536) - 32768;
@@ -121,16 +129,17 @@ void update_advertisement_data(uint8_t *mfg_data)
 	sequence_number++;
 	// reset sequence number if its > 65534, as the max allowed value is 65534
 	// 65535 is reserved for "not available"
-	if (sequence_number > 65534)
-	{
+	if (sequence_number > 65534) {
 		// reset sequence number, if greater than allowed value
-		// sequence number will be reset every ~23 days if a measurement is advertised every 30 seconds...
+		// sequence number will be reset every ~23 days if a measurement is advertised every
+		// 30 seconds...
 		sequence_number = 0;
 	}
 	mfg_data[18] = (sequence_number >> 8) & 0xFF;
 	mfg_data[19] = sequence_number & 0xFF;
 
-	LOG_INF("updated advertising values: temperature: %f, humidity: %f", temperature * 0.005, humidity * 0.0025);
+	LOG_INF("updated advertising values: temperature: %f, humidity: %f", temperature * 0.005,
+		humidity * 0.0025);
 	// turn off the green channel of the LED
 	gpio_pin_toggle_dt(&led_2_g);
 }
@@ -139,43 +148,35 @@ int init_leds(void)
 {
 	int err;
 	// setup the green LED (LED1)
-	if (!gpio_is_ready_dt(&led_1))
-	{
+	if (!gpio_is_ready_dt(&led_1)) {
 		return 1;
 	}
 	err = gpio_pin_configure_dt(&led_1, GPIO_OUTPUT_INACTIVE);
-	if (err)
-	{
+	if (err) {
 		return err;
 	}
 	// setup the red channel of LED2
-	if (!gpio_is_ready_dt(&led_2_r))
-	{
+	if (!gpio_is_ready_dt(&led_2_r)) {
 		return 1;
 	}
 	err = gpio_pin_configure_dt(&led_2_r, GPIO_OUTPUT_INACTIVE);
-	if (err)
-	{
+	if (err) {
 		return err;
 	}
 	// setup the green channel of LED2
-	if (!gpio_is_ready_dt(&led_2_g))
-	{
+	if (!gpio_is_ready_dt(&led_2_g)) {
 		return 1;
 	}
 	err = gpio_pin_configure_dt(&led_2_g, GPIO_OUTPUT_INACTIVE);
-	if (err)
-	{
+	if (err) {
 		return err;
 	}
 	// setup the blue channel of LED2
-	if (!gpio_is_ready_dt(&led_2_b))
-	{
+	if (!gpio_is_ready_dt(&led_2_b)) {
 		return 1;
 	}
 	err = gpio_pin_configure_dt(&led_2_b, GPIO_OUTPUT_INACTIVE);
-	if (err)
-	{
+	if (err) {
 		return err;
 	}
 	// led setup successful
@@ -189,33 +190,46 @@ int main(void)
 
 	LOG_INF("initializing LEDs...");
 	err = init_leds();
-	if (err)
-	{
+	if (err) {
 		LOG_ERR("LED init failed, err %d", err);
 		return 0;
 	}
 
 	LOG_INF("enabling BLE module...");
 	err = bt_enable(NULL);
-	if (err)
-	{
+	if (err) {
 		// turn on the red channel of the LED to indicate BLE init failure
 		gpio_pin_toggle_dt(&led_2_r);
 		LOG_ERR("BLE init failed, err %d", err);
 		return 0;
 	}
 
+	// dynamically set the BLE MAC address of the dongle in the payload
+	bt_addr_le_t addr;
+	size_t count = 1;
+	bt_id_get(&addr, &count);
+	// set mac address of payload bytes 20 - 25 from addr.a (neds to be in reverse order)
+	for (int i = 0; i < 6; i++) {
+		mfg_data[20 + i] = addr.a.val[5 - i];
+	}
+	// set the device name and append the last 2 bytes of the MAC address to the name
+	snprintf(device_name, sizeof(device_name), "%s %02X%02X", CONFIG_BT_DEVICE_NAME,
+		 addr.a.val[1], addr.a.val[0]);
+	// update the length of the device name scan response
+	sd[0].data_len = strlen(device_name);
+	LOG_INF("advertising as '%s' with address '%02X:%02X:%02X:%02X:%02X:%02X'", device_name,
+		addr.a.val[5], addr.a.val[4], addr.a.val[3], addr.a.val[2], addr.a.val[1],
+		addr.a.val[0]);
+
 	LOG_INF("BLE initialized, starting advertisement cycle...");
-	while (true)
-	{
+	while (true) {
 		// stop advertising before updating data
 		bt_le_adv_stop();
 		// update the advertisement data
 		update_advertisement_data(mfg_data);
 		// restart advertising with updated data
 		err = bt_le_adv_start(&adv_params, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-		if (err)
-		{
+		if (err) {
 			// turn on the blue channel of the LED to indicate advertising failure
 			gpio_pin_toggle_dt(&led_2_b);
 			LOG_ERR("advertisement failed to start, err %d", err);
