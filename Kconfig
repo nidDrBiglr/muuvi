@@ -1,0 +1,13 @@
+menu "Muuvi"
+
+endmenu
+
+module=muuvi
+module-dep=LOG
+module-str=nrf52840dongle Ruuvi
+
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu
