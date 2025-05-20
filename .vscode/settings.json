@@ -1,6 +1,11 @@
 {
     "files.associations": {
         "gpio.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "gatt.h": "c",
+        "nus.h": "c",
+        "bluetooth.h": "c",
+        "log.h": "c",
+        "stdio.h": "c"
     }
 }

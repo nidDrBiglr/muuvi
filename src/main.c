@@ -14,6 +14,7 @@
 #include <autoconf.h>
 
 #include "led.h"
+#include "gatt_services.h"
 
 #define MEASUREMENT_INTERVAL K_SECONDS(30)
 #define DEVICE_NAME_MAX_LEN  50
@@ -69,11 +70,27 @@ static uint8_t mfg_data[] = {
 // advertisement parameters
 static const struct bt_le_adv_param adv_params = {
 	.id = BT_ID_DEFAULT,
-	.options = BT_LE_ADV_OPT_USE_IDENTITY,       // use HW address
+	.options = BT_LE_ADV_OPT_CONNECTABLE,        // advertise as connectable
 	.interval_min = BT_GAP_PER_ADV_SLOW_INT_MIN, // 1s
 	.interval_max = BT_GAP_PER_ADV_SLOW_INT_MAX, // 1.2s
 	.peer = NULL,
 };
+
+// client connected callback
+static void connected(struct bt_conn *conn, uint8_t err)
+{
+	if (err) {
+		LOG_INF("Connection failed (err 0x%02x)", err);
+	} else {
+		LOG_INF("Device connected");
+	}
+}
+
+// client disconnected callback
+static void disconnected(struct bt_conn *conn, uint8_t reason)
+{
+	LOG_INF("Device disconnected (reason 0x%02x)\n", reason);
+}
 
 // advertisement data
 static const struct bt_data ad[] = {
@@ -155,6 +172,15 @@ int main(void)
 		LOG_ERR("BLE init failed, err %d", err);
 		return 0;
 	}
+
+	// register connection callbacks
+	struct bt_conn_cb conn_callbacks = {
+		.connected = connected,
+		.disconnected = disconnected,
+	};
+	bt_conn_cb_register(&conn_callbacks);
+	// init gatt services
+	init_gatt_services();
 
 	// dynamically set the BLE MAC address of the dongle in the payload
 	bt_addr_le_t addr;

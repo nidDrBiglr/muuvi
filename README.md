@@ -24,7 +24,7 @@ For more details see the [nrf52840dongle documentation](https://docs.nordicsemi.
 
 - updates to use latest ncs
 - get sensor values from DHT11 or DHT22 via I2C
-- add modules for DHT11/22 handling, BLE advertising and LED handling
+- add modules for DHT11/22 handling and BLE advertising
 - add sequence diagram
 - add hw wiring diagram
 - add LED status indicator documentation
