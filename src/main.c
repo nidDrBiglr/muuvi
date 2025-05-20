@@ -3,30 +3,25 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/drivers/gpio.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/random/random.h>
 #include <zephyr/bluetooth/bluetooth.h>
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <stdbool.h>
+#include <autoconf.h>
+
+#include "led.h"
 
 #define MEASUREMENT_INTERVAL K_SECONDS(30)
-#define LED1_NODE            DT_ALIAS(led0)
-#define LED2_NODE_R          DT_ALIAS(led1)
-#define LED2_NODE_G          DT_ALIAS(led2)
-#define LED2_NODE_B          DT_ALIAS(led3)
 #define DEVICE_NAME_MAX_LEN  50
 
 LOG_MODULE_REGISTER(muuvi);
 
-static const struct gpio_dt_spec led_1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
-static const struct gpio_dt_spec led_2_r = GPIO_DT_SPEC_GET(LED2_NODE_R, gpios);
-static const struct gpio_dt_spec led_2_g = GPIO_DT_SPEC_GET(LED2_NODE_G, gpios);
-static const struct gpio_dt_spec led_2_b = GPIO_DT_SPEC_GET(LED2_NODE_B, gpios);
-
 // see https://docs.ruuvi.com/communication/bluetooth-advertisements/data-format-5-rawv2
+// all payload values are initialized with their "not available" values
 static uint8_t mfg_data[] = {
 	// Company identifier (Ruuvi Innovations Ltd - 0x0499)
 	0x99, 0x04,
@@ -97,6 +92,9 @@ static struct bt_data sd[] = {
 // is not updated
 static uint16_t sequence_number = 65535;
 
+// boolean to indicate advertising state
+static bool is_advertising = false;
+
 // generate a random temperature value (-32767 to 32767, mapped to -163.835 to +163.835 degrees in
 // 0.005 increments)
 int16_t generate_random_temperature(void)
@@ -114,7 +112,7 @@ void update_advertisement_data(uint8_t *mfg_data)
 {
 	LOG_INF("collecting measurements...");
 	// turn on the green channel of the LED to indicate measurement collecting
-	gpio_pin_toggle_dt(&led_2_g);
+	toggle_measurement_led();
 	k_sleep(K_SECONDS(1));
 	// get temperature value
 	int16_t temperature = generate_random_temperature();
@@ -131,8 +129,7 @@ void update_advertisement_data(uint8_t *mfg_data)
 	// 65535 is reserved for "not available"
 	if (sequence_number > 65534) {
 		// reset sequence number, if greater than allowed value
-		// sequence number will be reset every ~23 days if a measurement is advertised every
-		// 30 seconds...
+		// sequence number will be reset every ~23 days with advertisements every 30 seconds
 		sequence_number = 0;
 	}
 	mfg_data[18] = (sequence_number >> 8) & 0xFF;
@@ -140,47 +137,8 @@ void update_advertisement_data(uint8_t *mfg_data)
 
 	LOG_INF("updated advertising values: temperature: %f, humidity: %f", temperature * 0.005,
 		humidity * 0.0025);
-	// turn off the green channel of the LED
-	gpio_pin_toggle_dt(&led_2_g);
-}
 
-int init_leds(void)
-{
-	int err;
-	// setup the green LED (LED1)
-	if (!gpio_is_ready_dt(&led_1)) {
-		return 1;
-	}
-	err = gpio_pin_configure_dt(&led_1, GPIO_OUTPUT_INACTIVE);
-	if (err) {
-		return err;
-	}
-	// setup the red channel of LED2
-	if (!gpio_is_ready_dt(&led_2_r)) {
-		return 1;
-	}
-	err = gpio_pin_configure_dt(&led_2_r, GPIO_OUTPUT_INACTIVE);
-	if (err) {
-		return err;
-	}
-	// setup the green channel of LED2
-	if (!gpio_is_ready_dt(&led_2_g)) {
-		return 1;
-	}
-	err = gpio_pin_configure_dt(&led_2_g, GPIO_OUTPUT_INACTIVE);
-	if (err) {
-		return err;
-	}
-	// setup the blue channel of LED2
-	if (!gpio_is_ready_dt(&led_2_b)) {
-		return 1;
-	}
-	err = gpio_pin_configure_dt(&led_2_b, GPIO_OUTPUT_INACTIVE);
-	if (err) {
-		return err;
-	}
-	// led setup successful
-	return 0;
+	toggle_measurement_led();
 }
 
 int main(void)
@@ -188,18 +146,12 @@ int main(void)
 	LOG_INF("---- starting Ruuvi for nrf52840dongle ----");
 	int err;
 
-	LOG_INF("initializing LEDs...");
-	err = init_leds();
-	if (err) {
-		LOG_ERR("LED init failed, err %d", err);
-		return 0;
-	}
+	init_leds();
 
-	LOG_INF("enabling BLE module...");
+	LOG_INF("initializing BLE module...");
 	err = bt_enable(NULL);
 	if (err) {
-		// turn on the red channel of the LED to indicate BLE init failure
-		gpio_pin_toggle_dt(&led_2_r);
+		set_ble_init_error_led();
 		LOG_ERR("BLE init failed, err %d", err);
 		return 0;
 	}
@@ -217,25 +169,29 @@ int main(void)
 		 addr.a.val[1], addr.a.val[0]);
 	// update the length of the device name scan response
 	sd[0].data_len = strlen(device_name);
-	LOG_INF("advertising as '%s' with address '%02X:%02X:%02X:%02X:%02X:%02X'", device_name,
+	LOG_INF("visible as '%s' with address '%02X:%02X:%02X:%02X:%02X:%02X'", device_name,
 		addr.a.val[5], addr.a.val[4], addr.a.val[3], addr.a.val[2], addr.a.val[1],
 		addr.a.val[0]);
 
 	LOG_INF("BLE initialized, starting advertisement cycle...");
 	while (true) {
-		// stop advertising before updating data
-		bt_le_adv_stop();
+		// stop advertising before updating the data
+		if (is_advertising) {
+			LOG_INF("stopping advertising sequence %d...", sequence_number);
+			bt_le_adv_stop();
+			is_advertising = false;
+		}
 		// update the advertisement data
 		update_advertisement_data(mfg_data);
 		// restart advertising with updated data
 		err = bt_le_adv_start(&adv_params, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 		if (err) {
-			// turn on the blue channel of the LED to indicate advertising failure
-			gpio_pin_toggle_dt(&led_2_b);
+			set_ble_adv_error_led();
 			LOG_ERR("advertisement failed to start, err %d", err);
 			return 0;
 		}
-		LOG_INF("advertising sequence %d", sequence_number);
+		is_advertising = true;
+		LOG_INF("advertising sequence %d started...", sequence_number);
 		// sleep until next measurement interval
 		k_sleep(MEASUREMENT_INTERVAL);
 	}
