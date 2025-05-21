@@ -82,10 +82,11 @@ static void connected(struct bt_conn *conn, uint8_t err)
 {
 	if (err) {
 		LOG_ERR("Connection failed, error 0x%02x (%s)", err, bt_hci_err_to_str(err));
+			set_led_pattern(&PATTERN_BLE_CONNECTION_FAILED);
 		return;
 	}
 
-	toggle_connection_led();
+	set_led_pattern(&PATTERN_BLE_CONNECTED);
 
 	struct bt_conn_info info;
 	if (bt_conn_get_info(conn, &info)) {
@@ -102,18 +103,20 @@ static void connected(struct bt_conn *conn, uint8_t err)
 // client disconnected callback
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-	toggle_connection_led();
+	set_led_pattern(&PATTERN_BLE_DISCONNECTED);
 
 	struct bt_conn_info info;
 	if (bt_conn_get_info(conn, &info)) {
-		LOG_INF("Device disconnected (reason 0x%02x %s)", reason, bt_hci_err_to_str(reason));
+		LOG_INF("Device disconnected (reason 0x%02x %s)", reason,
+			bt_hci_err_to_str(reason));
 		return;
 	}
 
 	char addr_str[BT_ADDR_LE_STR_LEN];
 	bt_addr_le_to_str(info.le.dst, addr_str, sizeof(addr_str));
 
-	LOG_INF("Device '%s' disconnected with reason 0x%02x(%s)", addr_str, reason, bt_hci_err_to_str(reason));
+	LOG_INF("Device '%s' disconnected with reason 0x%02x(%s)", addr_str, reason,
+		bt_hci_err_to_str(reason));
 }
 
 // advertisement data
@@ -153,8 +156,8 @@ void update_advertisement_data(uint8_t *mfg_data)
 {
 	LOG_INF("collecting measurements...");
 	// turn on the green channel of the LED to indicate measurement collecting
-	toggle_measurement_led();
-	k_sleep(K_SECONDS(1));
+	set_led_pattern(&PATTERN_COLLECTING_SENSOR);
+	k_sleep(K_SECONDS(3));
 	// get temperature value
 	int16_t temperature = generate_random_temperature();
 	uint16_t humidity = generate_random_humidity();
@@ -178,8 +181,6 @@ void update_advertisement_data(uint8_t *mfg_data)
 
 	LOG_INF("updated advertising values: temperature: %f, humidity: %f", temperature * 0.005,
 		humidity * 0.0025);
-
-	toggle_measurement_led();
 }
 
 int main(void)
@@ -192,7 +193,7 @@ int main(void)
 	LOG_INF("initializing BLE module...");
 	err = bt_enable(NULL);
 	if (err) {
-		set_ble_init_error_led();
+		set_led_pattern(&PATTERN_BLE_INIT_FAILED);
 		LOG_ERR("BLE init failed, err %d", err);
 		return 0;
 	}
@@ -236,11 +237,12 @@ int main(void)
 		// restart advertising with updated data
 		err = bt_le_adv_start(&adv_params, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 		if (err) {
-			set_ble_adv_error_led();
+			set_led_pattern(&PATTERN_BLE_ADVERTISING_FAILED);
 			LOG_ERR("advertisement failed to start, err %d", err);
 			return 0;
 		}
 		is_advertising = true;
+		set_led_pattern(&PATTERN_BLE_ADVERTISING);
 		LOG_INF("advertising sequence %d started...", sequence_number);
 		// sleep until next measurement interval
 		k_sleep(MEASUREMENT_INTERVAL);

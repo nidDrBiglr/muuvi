@@ -9,6 +9,7 @@ static void nus_rx_cb(struct bt_conn *conn, const uint8_t *const data, uint16_t 
 	bt_addr_le_t addr;
 	bt_addr_le_copy(&addr, bt_conn_get_dst(conn));
 	bt_addr_le_to_str(&addr, client_addr, sizeof(client_addr));
+	set_led_pattern(&PATTERN_NUS_RX_RECEIVED);
 
 	LOG_INF("NUS RX: received '%s' from '%s'", data, client_addr);
 }

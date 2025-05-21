@@ -6,7 +6,8 @@
 #include <bluetooth/services/nus.h>
 #include <zephyr/bluetooth/bluetooth.h>
 
+#include "led.h"
 
 void init_gatt_services(void);
 
-#endif
+#endif // GATT_SERVICES_H
