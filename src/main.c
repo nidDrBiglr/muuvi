@@ -5,6 +5,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/random/random.h>
+#include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/bluetooth.h>
 
 #include <stdio.h>
@@ -80,16 +81,39 @@ static const struct bt_le_adv_param adv_params = {
 static void connected(struct bt_conn *conn, uint8_t err)
 {
 	if (err) {
-		LOG_INF("Connection failed (err 0x%02x)", err);
-	} else {
-		LOG_INF("Device connected");
+		LOG_ERR("Connection failed, error 0x%02x (%s)", err, bt_hci_err_to_str(err));
+		return;
 	}
+
+	toggle_connection_led();
+
+	struct bt_conn_info info;
+	if (bt_conn_get_info(conn, &info)) {
+		LOG_ERR("Connected to unknown device");
+		return;
+	}
+
+	char addr_str[BT_ADDR_LE_STR_LEN];
+	bt_addr_le_to_str(info.le.dst, addr_str, sizeof(addr_str));
+
+	LOG_INF("Connected to device '%s'", addr_str);
 }
 
 // client disconnected callback
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-	LOG_INF("Device disconnected (reason 0x%02x)\n", reason);
+	toggle_connection_led();
+
+	struct bt_conn_info info;
+	if (bt_conn_get_info(conn, &info)) {
+		LOG_INF("Device disconnected (reason 0x%02x %s)", reason, bt_hci_err_to_str(reason));
+		return;
+	}
+
+	char addr_str[BT_ADDR_LE_STR_LEN];
+	bt_addr_le_to_str(info.le.dst, addr_str, sizeof(addr_str));
+
+	LOG_INF("Device '%s' disconnected with reason 0x%02x(%s)", addr_str, reason, bt_hci_err_to_str(reason));
 }
 
 // advertisement data

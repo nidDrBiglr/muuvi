@@ -13,5 +13,6 @@ void init_leds(void);
 void set_ble_adv_error_led(void);
 void toggle_measurement_led(void);
 void set_ble_init_error_led(void);
+void toggle_connection_led(void);
 
 #endif

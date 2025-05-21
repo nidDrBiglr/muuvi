@@ -6,6 +6,9 @@
         "nus.h": "c",
         "bluetooth.h": "c",
         "log.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "gatt_services.h": "c",
+        "log_core.h": "c",
+        "log_msg.h": "c"
     }
 }

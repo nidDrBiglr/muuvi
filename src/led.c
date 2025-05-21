@@ -45,3 +45,8 @@ void set_ble_adv_error_led(void)
 {
 	gpio_pin_set_dt(&led_2_b, true);
 }
+
+void toggle_connection_led(void)
+{
+	gpio_pin_toggle_dt(&led_1);
+}
