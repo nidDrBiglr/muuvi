@@ -23,8 +23,6 @@
 #ifndef LED_H
 #define LED_H
 
-#include <stdbool.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,6 +34,8 @@ extern "C" {
 #include <zephyr/drivers/gpio.h>
 
 #include <stdbool.h>
+
+#define PWM_PERIOD_USEC PWM_USEC(2000)
 
 /**
  * @brief PWM step function to control PWM LED patterns

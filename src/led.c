@@ -1,7 +1,5 @@
 #include "led.h"
 
-#define PWM_PERIOD_USEC PWM_USEC(2000)
-
 LOG_MODULE_REGISTER(led_ctrl);
 
 // GPIO LEDs

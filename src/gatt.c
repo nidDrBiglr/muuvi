@@ -1,4 +1,4 @@
-#include "gatt_services.h"
+#include "gatt.h"
 
 LOG_MODULE_REGISTER(gatt);
 

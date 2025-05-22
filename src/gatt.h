@@ -1,5 +1,5 @@
-#ifndef GATT_SERVICES_H
-#define GATT_SERVICES_H
+#ifndef GATT_H
+#define GATT_H
 
 #include <zephyr/logging/log.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -10,4 +10,4 @@
 
 void init_gatt_services(void);
 
-#endif // GATT_SERVICES_H
+#endif // GATT_H
