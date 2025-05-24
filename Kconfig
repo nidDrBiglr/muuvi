@@ -1,10 +1,30 @@
 menu "Muuvi"
 
+config MANUFACTURER_NAME
+	string "DIS Manufacturer Name"
+    default "Ruuvi Innovations Ltd."
+
+config MODEL_NUMBER
+	string "DIS Model Number"
+    default "RuuviTag"
+
+config FW_REV
+	string "DIS Firmware Revision"
+    default "RuuviFW 3.31.1"
+
+config HW_REV
+	string "DIS Hardware Revision"
+    default "B wi Biglr"
+
+config SERIAL_NUMBER
+	string "DIS Serial Number"
+    default "F9C3B50276D1"
+
 endmenu
 
-module=muuvi
+module=MUUVI
 module-dep=LOG
-module-str=nrf52840dongle Ruuvi
+module-str=nrf52840dongle Ruuvi Firmware
 
 source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 

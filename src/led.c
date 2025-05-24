@@ -4,12 +4,14 @@ LOG_MODULE_REGISTER(led_ctrl);
 
 // GPIO LEDs
 static const struct gpio_dt_spec led_1 = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
+
 static const struct gpio_dt_spec *gpio_leds[] = {&led_1};
 static size_t number_of_gpio_leds = sizeof(gpio_leds) / sizeof(gpio_leds[0]);
 // PWM LEDs
 static const struct pwm_dt_spec red_pwm_led = PWM_DT_SPEC_GET(DT_ALIAS(red_pwm_led));
 static const struct pwm_dt_spec green_pwm_led = PWM_DT_SPEC_GET(DT_ALIAS(green_pwm_led));
 static const struct pwm_dt_spec blue_pwm_led = PWM_DT_SPEC_GET(DT_ALIAS(blue_pwm_led));
+
 static const struct pwm_dt_spec *pwm_leds[] = {&red_pwm_led, &green_pwm_led, &blue_pwm_led};
 static size_t number_of_pwm_leds = sizeof(pwm_leds) / sizeof(pwm_leds[0]);
 // current pattern and step
@@ -57,6 +59,8 @@ void led_timer_handler(struct k_timer *timer)
 }
 
 // sets and triggers the given led pattern
+// todo: can cause a dead lock, if timing is unlucky... add a locking mechanism or cancel timer
+// immediately when invoked?
 void set_led_pattern(const led_pattern_t *pattern)
 {
 	if (leds_initialized) {
@@ -64,10 +68,10 @@ void set_led_pattern(const led_pattern_t *pattern)
 		pattern_step = 0;
 
 		if (pattern) {
-			LOG_INF("activating LED Pattern %s", pattern->name);
-			k_timer_start(&led_timer, K_NO_WAIT, K_MSEC(100));
+			LOG_DBG("activating LED Pattern %s", pattern->name);
+			k_timer_start(&led_timer, K_NO_WAIT, STEP_DURATION);
 		} else {
-			LOG_INF("turning all LEDs off");
+			LOG_DBG("turning all LEDs off");
 			k_timer_stop(&led_timer);
 			all_off();
 		}
@@ -111,10 +115,10 @@ bool pattern_ble_init_failed_step(int *step)
 	case 0:
 		set_rgb(PWM_PERIOD_USEC, 0, 0);
 		break;
-	case 20:
+	case 40:
 		pwm_off();
 		break;
-	case 70:
+	case 140:
 		*step = -1;
 		break;
 	}
@@ -132,14 +136,14 @@ bool pattern_ble_advertising_failed_step(int *step)
 {
 	switch (*step) {
 	case 0:
-	case 4:
+	case 8:
 		set_rgb(PWM_PERIOD_USEC, 0, 0); // red blink
 		break;
-	case 2:
-	case 6:
+	case 4:
+	case 12:
 		pwm_off();
 		break;
-	case 20:
+	case 40:
 		*step = -1; // reset after pause
 		break;
 	}
@@ -155,7 +159,7 @@ const led_pattern_t PATTERN_BLE_ADVERTISING_FAILED = {
 // pattern for collecting sensor data
 bool pattern_collecting_sensor_step(int *step)
 {
-	if (*step % 10 < 5) {
+	if (*step % 2 == 1) {
 		set_rgb(PWM_PERIOD_USEC, PWM_PERIOD_USEC, 0); // yellow on
 	} else {
 		pwm_off();
@@ -172,19 +176,19 @@ const led_pattern_t PATTERN_COLLECTING_SENSOR = {
 // pattern for advertising data change
 bool pattern_ble_advertising_step(int *step)
 {
-	int phase = *step % 20;
+	int phase = *step % 40;
 	uint32_t duty;
-
-	if (phase < 10) {
-		duty = (PWM_PERIOD_USEC * phase) / 10;
+	// calculate duty cycle for breathing pattern
+	if (phase < 20) {
+		duty = (PWM_PERIOD_USEC * phase) / 20;
 	} else {
-		duty = (PWM_PERIOD_USEC * (20 - phase)) / 10;
+		duty = (PWM_PERIOD_USEC * (40 - phase)) / 20;
 	}
 
-	set_rgb(0, duty, duty); // cyan
-	if (*step == 30) {
+	set_rgb(0, duty, duty / 2);
+	if (*step == 80) {
 		pwm_off();
-		return false; // done, after 3 seconds
+		return false;
 	}
 	(*step)++;
 	return true;
@@ -200,15 +204,17 @@ bool pattern_ble_connected_step(int *step)
 {
 	switch (*step) {
 	case 0:
-		set_rgb(PWM_PERIOD_USEC, 0, 0); // red
-		break;
-	case 1:
-		break;
-		set_rgb(0, PWM_PERIOD_USEC, 0); // green
 	case 2:
+	case 4:
+	case 6:
+		set_rgb(0, 0, PWM_PERIOD_USEC);
+		break;
+	case 7:
 		pwm_off();
 		gpio_pin_toggle_dt(&led_1);
-		return false; // done
+		return false;
+	default:
+		pwm_off();
 	}
 	(*step)++;
 	return true;
@@ -224,15 +230,15 @@ static bool pattern_ble_connection_failed_step(int *step)
 {
 	switch (*step) {
 	case 0:
-	case 4:
 	case 8:
-		set_rgb(PWM_PERIOD_USEC, 0, 0); // red on
+	case 16:
+		set_rgb(PWM_PERIOD_USEC, 0, 0);
 		break;
-	case 2:
-	case 6:
-	case 10:
+	case 4:
+	case 12:
+	case 20:
 		all_off();
-		return false; // done
+		return false;
 	}
 	(*step)++;
 	return true;
@@ -248,14 +254,14 @@ bool pattern_ble_disconnected_step(int *step)
 {
 	switch (*step) {
 	case 0:
-		set_rgb(0, PWM_PERIOD_USEC, 0); // green
-		break;
-	case 1:
-		set_rgb(PWM_PERIOD_USEC, 0, 0); // red
+		set_rgb(0, 0, PWM_PERIOD_USEC);
 		break;
 	case 2:
+		set_rgb(PWM_PERIOD_USEC, 0, 0);
+		break;
+	case 4:
 		all_off();
-		return false; // done
+		return false;
 	}
 	(*step)++;
 	return true;
@@ -266,16 +272,46 @@ const led_pattern_t PATTERN_BLE_DISCONNECTED = {
 	.step_fn = pattern_ble_disconnected_step,
 };
 
+// pattern for DIS TX received
+bool pattern_dis_tx_received_step(int *step)
+{
+
+	switch (*step) {
+	case 0:
+	case 2:
+		set_rgb(PWM_PERIOD_USEC, PWM_PERIOD_USEC / 4, PWM_PERIOD_USEC / 2);
+		break;
+	case 3:
+		pwm_off();
+		return false;
+	default:
+		pwm_off();
+	}
+	(*step)++;
+	return true;
+}
+
+const led_pattern_t PATTERN_DIS_TX_RECEIVED = {
+	.name = "DIS TX Command Received",
+	.step_fn = pattern_dis_tx_received_step,
+};
+
 // pattern for NUS RX received
 bool pattern_nus_rx_received_step(int *step)
 {
+
 	switch (*step) {
 	case 0:
-		set_rgb(PWM_PERIOD_USEC, 0, PWM_PERIOD_USEC); // purple
+	case 2:
+	case 4:
+	case 6:
+		set_rgb(PWM_PERIOD_USEC, 0, PWM_PERIOD_USEC);
 		break;
-	case 1:
+	case 7:
 		pwm_off();
-		return false; // done
+		return false;
+	default:
+		pwm_off();
 	}
 	(*step)++;
 	return true;

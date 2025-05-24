@@ -16,6 +16,10 @@
         "led.h": "c",
         "printk.h": "c",
         "util.h": "c",
-        "autoconf.h": "c"
+        "autoconf.h": "c",
+        "sensors.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c"
     }
 }

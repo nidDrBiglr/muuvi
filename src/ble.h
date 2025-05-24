@@ -6,7 +6,6 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/bluetooth/hci.h>
-#include <zephyr/random/random.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/bluetooth.h>
 
@@ -18,6 +17,8 @@
 
 #include "gatt.h"
 #include "led.h"
+#include "sensors.h"
+#include "utils.h"
 
 #define MEASUREMENT_INTERVAL K_SECONDS(30)
 #define DEVICE_NAME_MAX_LEN  50

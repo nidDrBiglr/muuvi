@@ -48,7 +48,7 @@ static uint8_t mfg_data[] = {
 	// will be dynamically set by the firmware after the BLE module is initialized
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-    // advertisement parameters
+// advertisement parameters
 static const struct bt_le_adv_param adv_params = {
 	.id = BT_ID_DEFAULT,
 	.options = BT_LE_ADV_OPT_CONNECTABLE,        // advertise as connectable
@@ -61,8 +61,8 @@ static const struct bt_le_adv_param adv_params = {
 static void connected(struct bt_conn *conn, uint8_t err)
 {
 	if (err) {
-		LOG_ERR("Connection failed, error 0x%02x (%s)", err, bt_hci_err_to_str(err));
-			set_led_pattern(&PATTERN_BLE_CONNECTION_FAILED);
+		LOG_ERR("Connection failed, error: 0x%02x %s", err, bt_hci_err_to_str(err));
+		set_led_pattern(&PATTERN_BLE_CONNECTION_FAILED);
 		return;
 	}
 
@@ -75,7 +75,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	}
 
 	char addr_str[BT_ADDR_LE_STR_LEN];
-	bt_addr_le_to_str(info.le.dst, addr_str, sizeof(addr_str));
+	bt_addr_le_to_str_without_type(info.le.dst, addr_str, sizeof(addr_str));
 
 	LOG_INF("Connected to device '%s'", addr_str);
 }
@@ -87,15 +87,15 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	struct bt_conn_info info;
 	if (bt_conn_get_info(conn, &info)) {
-		LOG_INF("Device disconnected (reason 0x%02x %s)", reason,
+		LOG_INF("Device disconnected, reason: 0x%02x %s", reason,
 			bt_hci_err_to_str(reason));
 		return;
 	}
 
 	char addr_str[BT_ADDR_LE_STR_LEN];
-	bt_addr_le_to_str(info.le.dst, addr_str, sizeof(addr_str));
+	bt_addr_le_to_str_without_type(info.le.dst, addr_str, sizeof(addr_str));
 
-	LOG_INF("Device '%s' disconnected with reason 0x%02x(%s)", addr_str, reason,
+	LOG_INF("Device '%s' disconnected, reason: 0x%02x %s", addr_str, reason,
 		bt_hci_err_to_str(reason));
 }
 
@@ -119,34 +119,21 @@ static uint16_t sequence_number = 65535;
 // boolean to indicate advertising state
 static bool is_advertising = false;
 
-// generate a random temperature value (-32767 to 32767, mapped to -163.835 to +163.835 degrees in
-// 0.005 increments)
-int16_t generate_random_temperature(void)
-{
-	return (sys_rand32_get() % 65536) - 32768;
-}
-
-// generate a random humidity value (0 to 40000, mapped to 0% to 100% in 0.0025 increments)
-uint16_t generate_random_humidity(void)
-{
-	return sys_rand32_get() % 40001;
-}
-
 void update_advertisement_data(uint8_t *mfg_data)
 {
 	LOG_INF("collecting measurements...");
 	// turn on the green channel of the LED to indicate measurement collecting
 	set_led_pattern(&PATTERN_COLLECTING_SENSOR);
-	k_sleep(K_SECONDS(3));
+	k_sleep(K_SECONDS(2));
 	// get temperature value
-	int16_t temperature = generate_random_temperature();
-	uint16_t humidity = generate_random_humidity();
+	measurement_t measurements;
+	read_sensor_values(&measurements);
 	// update temperature in advertisement data
-	mfg_data[3] = (temperature >> 8) & 0xFF;
-	mfg_data[4] = temperature & 0xFF;
+	mfg_data[3] = (measurements.temperature >> 8) & 0xFF;
+	mfg_data[4] = measurements.temperature & 0xFF;
 	// update humidity in advertisement data
-	mfg_data[5] = (humidity >> 8) & 0xFF;
-	mfg_data[6] = humidity & 0xFF;
+	mfg_data[5] = (measurements.humidity >> 8) & 0xFF;
+	mfg_data[6] = measurements.humidity & 0xFF;
 	// update sequence number in advertisement data
 	sequence_number++;
 	// reset sequence number if its > 65534, as the max allowed value is 65534
@@ -159,8 +146,8 @@ void update_advertisement_data(uint8_t *mfg_data)
 	mfg_data[18] = (sequence_number >> 8) & 0xFF;
 	mfg_data[19] = sequence_number & 0xFF;
 
-	LOG_INF("updated advertising values: temperature: %f, humidity: %f", temperature * 0.005,
-		humidity * 0.0025);
+	LOG_INF("updated advertising values: temperature: %f, humidity: %f",
+		measurements.temperature * 0.005, measurements.humidity * 0.0025);
 }
 
 void init_ble()
