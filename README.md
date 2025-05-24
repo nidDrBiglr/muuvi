@@ -27,7 +27,6 @@ For more details see the [nrf52840dongle documentation](https://docs.nordicsemi.
 
 - refactor to be event- and module based
 - get sensor values from DHT11 or DHT22 via I2C
-- add modules for sensor value collection
 - add sequence diagram
 - add hw wiring diagram
 - add LED status indicator documentation
