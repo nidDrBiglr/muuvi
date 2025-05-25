@@ -1,5 +1,27 @@
 #include "ble.h"
 
+#include <zephyr/types.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/bluetooth.h>
+
+#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <autoconf.h>
+
+#include "gatt.h"
+#include "../led/led.h"
+#include "../utils/utils.h"
+#include "../sensing/sensors.h"
+#include "../events/event_bus.h"
+
+#define DEVICE_NAME_MAX_LEN 50
+
 LOG_MODULE_REGISTER(ble);
 
 // see https://docs.ruuvi.com/communication/bluetooth-advertisements/data-format-5-rawv2
@@ -119,15 +141,10 @@ static uint16_t sequence_number = 65535;
 // boolean to indicate advertising state
 static bool is_advertising = false;
 
-void update_advertisement_data(uint8_t *mfg_data)
+void update_advertisement_data(uint8_t *mfg_data, app_event_t *event)
 {
 	LOG_INF("collecting measurements...");
-	// turn on the green channel of the LED to indicate measurement collecting
-	set_led_pattern(&PATTERN_COLLECTING_SENSOR);
-	k_sleep(K_SECONDS(2));
-	// get temperature value
-	measurement_t measurements;
-	read_sensor_values(&measurements);
+	measurement_t measurements = event->data.measurement;
 	// update temperature in advertisement data
 	mfg_data[3] = (measurements.temperature >> 8) & 0xFF;
 	mfg_data[4] = measurements.temperature & 0xFF;
@@ -145,12 +162,31 @@ void update_advertisement_data(uint8_t *mfg_data)
 	}
 	mfg_data[18] = (sequence_number >> 8) & 0xFF;
 	mfg_data[19] = sequence_number & 0xFF;
-
-	LOG_INF("updated advertising values: temperature: %f, humidity: %f",
-		measurements.temperature * 0.005, measurements.humidity * 0.0025);
 }
 
-void init_ble()
+void restart_advertisement(app_event_t *event)
+{
+	// stop advertising before updating the data
+	if (is_advertising) {
+		LOG_INF("stopping advertising sequence %d...", sequence_number);
+		bt_le_adv_stop();
+		is_advertising = false;
+	}
+	// update the advertisement data
+	update_advertisement_data(mfg_data, event);
+	// restart advertising with updated data
+	int err = bt_le_adv_start(&adv_params, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+	if (err) {
+		set_led_pattern(&PATTERN_BLE_ADVERTISING_FAILED);
+		LOG_ERR("advertisement failed to start, err %d", err);
+		return;
+	}
+	is_advertising = true;
+	set_led_pattern(&PATTERN_BLE_ADVERTISING);
+	LOG_INF("advertising sequence %d started...", sequence_number);
+}
+
+void ble_init(void)
 {
 	int err;
 	LOG_INF("initializing BLE module...");
@@ -187,27 +223,17 @@ void init_ble()
 		addr.a.val[5], addr.a.val[4], addr.a.val[3], addr.a.val[2], addr.a.val[1],
 		addr.a.val[0]);
 
-	LOG_INF("BLE initialized, starting advertisement cycle...");
-	while (true) {
-		// stop advertising before updating the data
-		if (is_advertising) {
-			LOG_INF("stopping advertising sequence %d...", sequence_number);
-			bt_le_adv_stop();
-			is_advertising = false;
+	LOG_INF("BLE initialized");
+}
+
+void ble_run(void)
+{
+	app_event_t evt;
+	while (1) {
+		int ret = event_bus_get(&evt, K_FOREVER);
+		if (ret == 0 && evt.type == SENSOR_DATA_READY_EVENT) {
+			LOG_INF("Received SENSOR_SAMPLE_EVENT");
+			restart_advertisement(&evt);
 		}
-		// update the advertisement data
-		update_advertisement_data(mfg_data);
-		// restart advertising with updated data
-		err = bt_le_adv_start(&adv_params, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-		if (err) {
-			set_led_pattern(&PATTERN_BLE_ADVERTISING_FAILED);
-			LOG_ERR("advertisement failed to start, err %d", err);
-			return;
-		}
-		is_advertising = true;
-		set_led_pattern(&PATTERN_BLE_ADVERTISING);
-		LOG_INF("advertising sequence %d started...", sequence_number);
-		// sleep until next measurement interval
-		k_sleep(MEASUREMENT_INTERVAL);
 	}
 }

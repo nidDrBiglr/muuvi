@@ -1,25 +1,7 @@
 {
     "files.associations": {
-        "gpio.h": "c",
-        "stdbool.h": "c",
-        "gatt.h": "c",
-        "nus.h": "c",
-        "bluetooth.h": "c",
-        "log.h": "c",
-        "stdio.h": "c",
-        "gatt_services.h": "c",
-        "log_core.h": "c",
-        "log_msg.h": "c",
-        "device.h": "c",
-        "pwm.h": "c",
-        "kernel.h": "c",
-        "led.h": "c",
-        "printk.h": "c",
-        "util.h": "c",
-        "autoconf.h": "c",
         "sensors.h": "c",
-        "array": "c",
-        "string": "c",
-        "string_view": "c"
+        "controller.h": "c",
+        "event_bus.h": "c"
     }
 }

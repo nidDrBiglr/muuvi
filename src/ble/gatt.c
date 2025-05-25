@@ -1,5 +1,15 @@
 #include "gatt.h"
 
+#include <zephyr/logging/log.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <bluetooth/services/nus.h>
+#include <zephyr/bluetooth/bluetooth.h>
+
+#include <autoconf.h>
+
+#include "../led/led.h"
+#include "../utils/utils.h"
+
 LOG_MODULE_REGISTER(gatt);
 
 static ssize_t dis_tx_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,

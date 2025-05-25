@@ -24,20 +24,13 @@
 #ifndef LED_H
 #define LED_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/logging/log.h>
-#include <zephyr/drivers/pwm.h>
-#include <zephyr/drivers/gpio.h>
+#pragma once
 
 #include <stdbool.h>
 
-#define PWM_PERIOD_USEC PWM_USEC(2000)
-#define STEP_DURATION   K_MSEC(50)
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @brief PWM step function to control PWM LED patterns
@@ -64,7 +57,9 @@ extern const led_pattern_t PATTERN_NUS_RX_RECEIVED;
 /**
  * @brief init the LEDs. Must be invoked in order to show any patterns
  */
-void init_leds(void);
+void led_init(void);
+
+void led_run(void);
 
 /**
  * @brief set the pattern to be shown.

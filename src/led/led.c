@@ -1,5 +1,16 @@
 #include "led.h"
 
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/drivers/pwm.h>
+#include <zephyr/drivers/gpio.h>
+
+#include "../events/event_bus.h"
+
+#define PWM_PERIOD_USEC PWM_USEC(2000)
+#define STEP_DURATION   K_MSEC(50)
+
 LOG_MODULE_REGISTER(led_ctrl);
 
 // GPIO LEDs
@@ -80,7 +91,7 @@ void set_led_pattern(const led_pattern_t *pattern)
 	}
 }
 
-void init_leds(void)
+void led_init(void)
 {
 	LOG_INF("initializing GPIO %d LEDs...", number_of_gpio_leds);
 	for (int i = 0; i < number_of_gpio_leds; i++) {
@@ -106,6 +117,18 @@ void init_leds(void)
 
 	// initialize the timer to handle PWM pulsing
 	k_timer_init(&led_timer, led_timer_handler, NULL);
+}
+
+void led_run(void)
+{
+	app_event_t evt;
+	while (1) {
+		int ret = event_bus_get(&evt, K_FOREVER);
+		if (ret == 0 && evt.type == LED_UPDATE_EVENT) {
+			LOG_INF("Received LED_UPDATE_EVENT");
+			set_led_pattern(&evt.data.led_pattern);
+		}
+	}
 }
 
 // error pattern for BLE init failure
