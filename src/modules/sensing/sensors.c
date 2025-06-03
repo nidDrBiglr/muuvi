@@ -27,7 +27,7 @@ void sensors_init()
 void sensors_run(void)
 {
 	app_event_t evt;
-	while (1) {
+	while (true) {
 		int ret = event_bus_get(&evt, K_FOREVER);
 		if (ret == 0 && evt.type == SENSOR_SAMPLE_EVENT) {
 			LOG_INF("Received SENSOR_SAMPLE_EVENT");
@@ -43,5 +43,6 @@ void sensors_run(void)
 
 			event_bus_post(&new_evt);
 		}
+		k_sleep(POLL_INTERVAL);
 	}
 }

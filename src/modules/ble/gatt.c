@@ -7,8 +7,8 @@
 
 #include <autoconf.h>
 
-#include "../led/led.h"
-#include "../utils/utils.h"
+#include "led.h"
+#include "utils.h"
 
 LOG_MODULE_REGISTER(gatt);
 

@@ -122,12 +122,13 @@ void led_init(void)
 void led_run(void)
 {
 	app_event_t evt;
-	while (1) {
+	while (true) {
 		int ret = event_bus_get(&evt, K_FOREVER);
 		if (ret == 0 && evt.type == LED_UPDATE_EVENT) {
 			LOG_INF("Received LED_UPDATE_EVENT");
 			set_led_pattern(&evt.data.led_pattern);
 		}
+		k_sleep(POLL_INTERVAL);
 	}
 }
 

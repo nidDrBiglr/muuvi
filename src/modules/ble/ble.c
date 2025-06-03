@@ -15,10 +15,10 @@
 #include <autoconf.h>
 
 #include "gatt.h"
-#include "../led/led.h"
-#include "../utils/utils.h"
-#include "../sensing/sensors.h"
-#include "../events/event_bus.h"
+#include "led.h"
+#include "utils.h"
+#include "sensors.h"
+#include "event_bus.h"
 
 #define DEVICE_NAME_MAX_LEN 50
 
@@ -229,11 +229,12 @@ void ble_init(void)
 void ble_run(void)
 {
 	app_event_t evt;
-	while (1) {
+	while (true) {
 		int ret = event_bus_get(&evt, K_FOREVER);
 		if (ret == 0 && evt.type == SENSOR_DATA_READY_EVENT) {
 			LOG_INF("Received SENSOR_SAMPLE_EVENT");
 			restart_advertisement(&evt);
 		}
+		k_sleep(POLL_INTERVAL);
 	}
 }

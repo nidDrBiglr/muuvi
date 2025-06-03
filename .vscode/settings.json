@@ -2,6 +2,8 @@
     "files.associations": {
         "sensors.h": "c",
         "controller.h": "c",
-        "event_bus.h": "c"
+        "event_bus.h": "c",
+        "message_channel.h": "c",
+        "log_ctrl.h": "c"
     }
 }
