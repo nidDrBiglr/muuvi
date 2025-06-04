@@ -11,6 +11,8 @@ int main(void)
 
 	init_leds();
 
+	init_sensors();
+
 	init_ble();
 
 	return 0;
