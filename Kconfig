@@ -20,6 +20,10 @@ config SERIAL_NUMBER
 	string "DIS Serial Number"
     default "F9C3B50276D1"
 
+rsource "src/modules/trigger/Kconfig.trigger"
+rsource "src/modules/error/Kconfig.error"
+rsource "src/modules/sensing/Kconfig.sensing"
+
 endmenu
 
 module=MUUVI

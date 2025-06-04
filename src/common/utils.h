@@ -3,6 +3,10 @@
 
 #include <zephyr/bluetooth/bluetooth.h>
 
+#define TEMP_INVALID_MEASUREMENT 32768
+#define HUM_INVALID_MEASUREMENT  65535
+#define SEQUENCE_NUMER_INVALID   65535
+
 /** @brief Converts binary LE Bluetooth address to string. in comparison to the zephyr variant, this
  * does not append the address tpye in brackets (because it's irrelevant)...
  *

@@ -1,0 +1,17 @@
+menu "Sensing"
+
+config SENSING_THREAD_STACK_SIZE
+	int "Thread stack size"
+	default 1024
+
+config SENSING_MESSAGE_QUEUE_SIZE
+	int "Message queue size"
+	default 5
+	help
+	  ZBus subscriber message queue size.
+
+module = SENSING
+module-str = Sensing
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # Sensing

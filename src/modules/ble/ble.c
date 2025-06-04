@@ -1,6 +1,7 @@
 #include "ble.h"
 
 LOG_MODULE_REGISTER(ble);
+ZBUS_SUBSCRIBER_DEFINE(advertising, CONFIG_SENSING_MESSAGE_QUEUE_SIZE);
 
 // see https://docs.ruuvi.com/communication/bluetooth-advertisements/data-format-5-rawv2
 // all payload values are initialized with their "not available" values
@@ -111,43 +112,28 @@ static struct bt_data sd[] = {
 	BT_DATA(BT_DATA_TX_POWER, "\x00", 1),           // tx power level (+0dBm), static
 };
 
-// sequence number, will be updated whenever a new measurement is recorded
-// set initial value to 65535 to indicate "not available" if, for some reason, the sequence number
-// is not updated
-static uint16_t sequence_number = 65535;
-
 // boolean to indicate advertising state
 static bool is_advertising = false;
 
-void update_advertisement_data(uint8_t *mfg_data)
+void update_advertisement_data(uint8_t *mfg_data, measurement_t *measurements)
 {
 	LOG_INF("collecting measurements...");
 	// turn on the green channel of the LED to indicate measurement collecting
 	set_led_pattern(&PATTERN_COLLECTING_SENSOR);
 	k_sleep(K_SECONDS(2));
-	// get temperature value
-	measurement_t measurements;
-	read_sensor_values(&measurements);
 	// update temperature in advertisement data
-	mfg_data[3] = (measurements.temperature >> 8) & 0xFF;
-	mfg_data[4] = measurements.temperature & 0xFF;
+	mfg_data[3] = (measurements->temperature >> 8) & 0xFF;
+	mfg_data[4] = measurements->temperature & 0xFF;
 	// update humidity in advertisement data
-	mfg_data[5] = (measurements.humidity >> 8) & 0xFF;
-	mfg_data[6] = measurements.humidity & 0xFF;
+	mfg_data[5] = (measurements->humidity >> 8) & 0xFF;
+	mfg_data[6] = measurements->humidity & 0xFF;
 	// update sequence number in advertisement data
-	sequence_number++;
-	// reset sequence number if its > 65534, as the max allowed value is 65534
-	// 65535 is reserved for "not available"
-	if (sequence_number > 65534) {
-		// reset sequence number, if greater than allowed value
-		// sequence number will be reset every ~23 days with advertisements every 30 seconds
-		sequence_number = 0;
-	}
-	mfg_data[18] = (sequence_number >> 8) & 0xFF;
-	mfg_data[19] = sequence_number & 0xFF;
+
+	mfg_data[18] = (measurements->sequence_number >> 8) & 0xFF;
+	mfg_data[19] = measurements->sequence_number & 0xFF;
 
 	LOG_INF("updated advertising values: temperature: %f, humidity: %f",
-		measurements.temperature * 0.005, measurements.humidity * 0.0025);
+		measurements->temperature * 0.005, measurements->humidity * 0.0025);
 }
 
 void init_ble()
@@ -188,26 +174,44 @@ void init_ble()
 		addr.a.val[0]);
 
 	LOG_INF("BLE initialized, starting advertisement cycle...");
-	while (true) {
-		// stop advertising before updating the data
-		if (is_advertising) {
-			LOG_INF("stopping advertising sequence %d...", sequence_number);
-			bt_le_adv_stop();
-			is_advertising = false;
+}
+
+static void advertising_task(void)
+{
+	const struct zbus_channel *chan;
+	measurement_t measurements;
+	
+	init_ble();
+
+	while (!zbus_sub_wait(&advertising, &chan, K_FOREVER)) {
+		if (&PAYLOAD_CHAN == chan) {
+			int err = zbus_chan_read(&PAYLOAD_CHAN, &measurements, K_SECONDS(1));
+			if (err) {
+				LOG_ERR("zbus_chan_read, error: %d", err);
+				SEND_FATAL_ERROR();
+				return;
+			}
+			// stop advertising before updating the data
+			if (is_advertising) {
+				LOG_INF("stopping advertising sequence %d...", measurements.sequence_number);
+				bt_le_adv_stop();
+				is_advertising = false;
+			}
+			// update the advertisement data
+			update_advertisement_data(mfg_data, &measurements);
+			// restart advertising with updated data
+			err = bt_le_adv_start(&adv_params, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+			if (err) {
+				set_led_pattern(&PATTERN_BLE_ADVERTISING_FAILED);
+				LOG_ERR("advertisement failed to start, err %d", err);
+				return;
+			}
+			is_advertising = true;
+			set_led_pattern(&PATTERN_BLE_ADVERTISING);
+			LOG_INF("advertising sequence %d started...", measurements.sequence_number);
 		}
-		// update the advertisement data
-		update_advertisement_data(mfg_data);
-		// restart advertising with updated data
-		err = bt_le_adv_start(&adv_params, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-		if (err) {
-			set_led_pattern(&PATTERN_BLE_ADVERTISING_FAILED);
-			LOG_ERR("advertisement failed to start, err %d", err);
-			return;
-		}
-		is_advertising = true;
-		set_led_pattern(&PATTERN_BLE_ADVERTISING);
-		LOG_INF("advertising sequence %d started...", sequence_number);
-		// sleep until next measurement interval
-		k_sleep(MEASUREMENT_INTERVAL);
 	}
 }
+
+K_THREAD_DEFINE(advertising_task_id, CONFIG_SENSING_THREAD_STACK_SIZE, advertising_task, NULL, NULL,
+		NULL, 3, 0, 0);

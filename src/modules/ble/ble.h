@@ -19,6 +19,7 @@
 #include "led.h"
 #include "sensors.h"
 #include "utils.h"
+#include "message_channel.h"
 
 #define MEASUREMENT_INTERVAL K_SECONDS(30)
 #define DEVICE_NAME_MAX_LEN  50
