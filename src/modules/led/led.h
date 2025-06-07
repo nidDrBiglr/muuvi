@@ -28,16 +28,7 @@
 extern "C" {
 #endif
 
-#include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/logging/log.h>
-#include <zephyr/drivers/pwm.h>
-#include <zephyr/drivers/gpio.h>
-
 #include <stdbool.h>
-
-#define PWM_PERIOD_USEC PWM_USEC(2000)
-#define STEP_DURATION   K_MSEC(50)
 
 /**
  * @brief PWM step function to control PWM LED patterns
@@ -60,22 +51,6 @@ extern const led_pattern_t PATTERN_BLE_CONNECTION_FAILED;
 extern const led_pattern_t PATTERN_BLE_DISCONNECTED;
 extern const led_pattern_t PATTERN_DIS_TX_RECEIVED;
 extern const led_pattern_t PATTERN_NUS_RX_RECEIVED;
-
-/**
- * @brief init the LEDs. Must be invoked in order to show any patterns
- */
-void init_leds(void);
-
-/**
- * @brief set the pattern to be shown.
- *
- * In order to reset the current pattern or turn the LEDs off, invoke with NULL.
- *
- * NOTE: setting a pattern while another one is already running will override it.
- * It also might sometimes cause deadlocks... its really up to chance
- *
- */
-void set_led_pattern(const led_pattern_t *pattern);
 
 #ifdef __cplusplus
 }

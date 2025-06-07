@@ -4,7 +4,12 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(muuvi)
 
-FILE(GLOB app_sources src/*.c)
-target_sources(app PRIVATE ${app_sources})
+# Include files that are common for all modules
+add_subdirectory(src/common)
 
-zephyr_library_include_directories(${ZEPHYR_BASE}/samples/bluetooth)
+# Include mandatory module source folders
+add_subdirectory(src/modules/ble)
+add_subdirectory(src/modules/error)
+add_subdirectory(src/modules/led)
+add_subdirectory(src/modules/sensing)
+add_subdirectory(src/modules/trigger)

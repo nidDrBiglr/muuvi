@@ -20,6 +20,11 @@
         "sensors.h": "c",
         "array": "c",
         "string": "c",
-        "string_view": "c"
+        "string_view": "c",
+        "log_ctrl.h": "c",
+        "message_channel.h": "c",
+        "sensor.h": "c",
+        "utils.h": "c",
+        "zbus.h": "c"
     }
 }

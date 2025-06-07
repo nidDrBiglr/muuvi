@@ -1,0 +1,37 @@
+menu "Bluetooth Controller"
+
+config BLE_ADV_MANUFACTURER_NAME
+	string "DIS Manufacturer Name"
+    default "Ruuvi Innovations Ltd."
+
+config BLE_ADV_MODEL_NUMBER
+	string "DIS Model Number"
+    default "RuuviTag"
+
+config BLE_ADV_FW_REV
+	string "DIS Firmware Revision"
+    default "RuuviFW 3.31.1"
+
+config BLE_ADV_HW_REV
+	string "DIS Hardware Revision"
+    default "B wi Biglr"
+
+config BLE_ADV_SERIAL_NUMBER
+	string "DIS Serial Number"
+    default "F9C3B50276D1"
+
+config BLE_THREAD_STACK_SIZE
+	int "Thread stack size"
+	default 1024
+
+config BLE_MESSAGE_QUEUE_SIZE
+	int "Message queue size"
+	default 5
+	help
+	  ZBus subscriber message queue size.
+
+module = BLE
+module-str = BLE Controller
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # Bluetooth Controller
