@@ -1,6 +1,21 @@
 #include "led.h"
 
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/zbus/zbus.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/drivers/pwm.h>
+#include <zephyr/drivers/gpio.h>
+
+#include <stdbool.h>
+
+#include "message_channel.h"
+
+#define PWM_PERIOD_USEC PWM_USEC(2000)
+#define STEP_DURATION   K_MSEC(50)
+
 LOG_MODULE_REGISTER(led_ctrl);
+ZBUS_SUBSCRIBER_DEFINE(led_controller, CONFIG_LED_MESSAGE_QUEUE_SIZE);
 
 // GPIO LEDs
 static const struct gpio_dt_spec led_1 = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
@@ -58,28 +73,6 @@ void led_timer_handler(struct k_timer *timer)
 	}
 }
 
-// sets and triggers the given led pattern
-// todo: can cause a dead lock, if timing is unlucky... add a locking mechanism or cancel timer
-// immediately when invoked?
-void set_led_pattern(const led_pattern_t *pattern)
-{
-	if (leds_initialized) {
-		current_pattern = pattern;
-		pattern_step = 0;
-
-		if (pattern) {
-			LOG_DBG("activating LED Pattern %s", pattern->name);
-			k_timer_start(&led_timer, K_NO_WAIT, STEP_DURATION);
-		} else {
-			LOG_DBG("turning all LEDs off");
-			k_timer_stop(&led_timer);
-			all_off();
-		}
-	} else {
-		LOG_WRN("some of the GPIO or PWM LEDs could not be initialized, ignoring...");
-	}
-}
-
 void init_leds(void)
 {
 	LOG_INF("initializing GPIO %d LEDs...", number_of_gpio_leds);
@@ -107,6 +100,50 @@ void init_leds(void)
 	// initialize the timer to handle PWM pulsing
 	k_timer_init(&led_timer, led_timer_handler, NULL);
 }
+
+// sets and triggers the given led pattern
+void set_led_pattern(const led_pattern_t *pattern)
+{
+	if (leds_initialized) {
+		current_pattern = pattern;
+		pattern_step = 0;
+
+		if (pattern) {
+			LOG_DBG("activating LED Pattern %s", pattern->name);
+			k_timer_start(&led_timer, K_NO_WAIT, STEP_DURATION);
+		} else {
+			LOG_DBG("turning all LEDs off");
+			k_timer_stop(&led_timer);
+			all_off();
+		}
+	} else {
+		LOG_WRN("some of the GPIO or PWM LEDs could not be initialized, ignoring...");
+	}
+}
+
+
+static void led_task(void)
+{
+	const struct zbus_channel *chan;
+	static led_pattern_t led_pattern;
+
+	init_leds();
+
+	while (!zbus_sub_wait(&led_controller, &chan, K_FOREVER)) {
+		if (&LED_PATTERN_CHAN == chan) {
+			int err = zbus_chan_read(&LED_PATTERN_CHAN, &led_pattern, K_SECONDS(1));
+			if (err) {
+				LOG_ERR("zbus_chan_read, error: %d", err);
+				SEND_FATAL_ERROR();
+				return;
+			}
+			LOG_INF("got led pattern '%s'", led_pattern.name);
+			set_led_pattern(&led_pattern);
+		}
+	}
+}
+
+K_THREAD_DEFINE(led_task_id, CONFIG_LED_THREAD_STACK_SIZE, led_task, NULL, NULL, NULL, 3, 0, 0);
 
 // error pattern for BLE init failure
 bool pattern_ble_init_failed_step(int *step)

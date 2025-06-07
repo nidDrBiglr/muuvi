@@ -1,0 +1,18 @@
+menu "LED Controller"
+
+
+config LED_THREAD_STACK_SIZE
+	int "Thread stack size"
+	default 1024
+
+config LED_MESSAGE_QUEUE_SIZE
+	int "Message queue size"
+	default 5
+	help
+	  ZBus subscriber message queue size.
+
+module = LED
+module-str = LED Controller
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # LED Controller

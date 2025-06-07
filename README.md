@@ -2,7 +2,7 @@
 
 This projects implements the Ruuvi advertisement protocol for a nrf52840dongle.
 
-The idea is to connect a DHT11 or DHT22 sensors (or similar) to record environmental measurements and broadcast them using the [Ruuvi payload format](https://docs.ruuvi.com/communication/bluetooth-advertisements/data-format-5-rawv2).
+The idea is to connect a DHT22 sensor (or similar) to record environmental measurements and broadcast them using the [Ruuvi payload format](https://docs.ruuvi.com/communication/bluetooth-advertisements/data-format-5-rawv2).
 
 At the moment, the firmware just consists of mocking the Ruuvi payload with valid randomly generated data values (hence the name Muuvi).
 Currently, only temperature and humidity are mocked.
@@ -26,8 +26,10 @@ For more details see the [nrf52840dongle documentation](https://docs.nordicsemi.
 ## TODOs
 
 - refactor to be event- and module based
-- get sensor values from DHT11 or DHT22 via I2C
+  - current issues: 
+    - active connections lead to deadlocks...
 - add sequence diagram
 - add hw wiring diagram
+- add 3d model for case
 - add LED status indicator documentation
 - add github actions workflow to build the hex file and add it as a release (very low prio)

@@ -1,5 +1,6 @@
 #include "sensors.h"
 #include "utils.h"
+#include "led.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -62,9 +63,16 @@ static void sensing_task(void)
 
 	while (!zbus_sub_wait(&sampler, &chan, K_FOREVER)) {
 		if (&TRIGGER_CHAN == chan) {
+			// turn on the green channel of the LED to indicate measurement collecting
+			int err = zbus_chan_pub(&LED_PATTERN_CHAN, &PATTERN_COLLECTING_SENSOR,
+						K_SECONDS(1));
+			if (err) {
+				LOG_ERR("zbus_chan_pub, error: %d", err);
+				SEND_FATAL_ERROR();
+			}
 			read_sensor_values(&measurements);
 
-			int err = zbus_chan_read(&TRIGGER_CHAN, &sequence_number, K_SECONDS(1));
+			err = zbus_chan_read(&TRIGGER_CHAN, &sequence_number, K_SECONDS(1));
 			if (err) {
 				LOG_ERR("zbus_chan_read, error: %d", err);
 				SEND_FATAL_ERROR();
